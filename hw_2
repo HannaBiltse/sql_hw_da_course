@@ -1,0 +1,54 @@
+select ad_date, 
+	   campaign_id, 	 
+	   sum(spend) as  total_spend, 
+	   sum(impressions) as total_impressions,
+	   sum(clicks) as total_clicks, 
+	   sum(value) as total_value
+from facebook_ads_basic_daily fabd 
+group by ad_date, campaign_id
+order by ad_date, campaign_id
+;
+
+select ad_date, 
+	   campaign_id,
+	   sum(spend) as total_spend,
+	   sum(clicks) as total_clicks,
+	   sum(spend)::numeric/sum(clicks) as cpc
+from facebook_ads_basic_daily fabd 
+where clicks  >0
+group by ad_date, campaign_id
+order by ad_date ,campaign_id 
+;
+
+select ad_date, 
+	   campaign_id,
+	   sum(impressions)as total_impressions,
+	   sum(clicks) as total_clicks,
+	   sum(clicks)::numeric/sum(impressions)::numeric as ctr
+from facebook_ads_basic_daily fabd 
+where impressions  >0
+group by ad_date ,campaign_id, impressions, clicks 
+order by ad_date ,campaign_id 
+;
+
+select ad_date, 
+	   campaign_id,	   
+	   sum(spend) as total_spend,
+	   sum(impressions) as total_impressions,
+	   sum(spend)::numeric / sum(impressions)*1000 as cpm
+from facebook_ads_basic_daily fabd 
+where impressions >0
+group by campaign_id, ad_date, impressions, spend 
+order by campaign_id, ad_date 
+;
+
+select ad_date, 
+	   campaign_id,	
+	   sum(spend) as total_spend,
+	   sum(value) as total_value,
+       sum(value)/sum(spend)::numeric as romi
+from facebook_ads_basic_daily
+group by ad_date , campaign_id
+having sum(leads)>0
+order by romi desc
+;
