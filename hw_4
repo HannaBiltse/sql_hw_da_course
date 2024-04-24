@@ -1,0 +1,199 @@
+--Task 1
+
+select *
+from facebook_ads_basic_daily fabd 
+;
+
+
+select *
+from facebook_adset fa 
+;
+
+
+select *
+from facebook_campaign fc 
+;
+
+
+select fabd.ad_date,
+	   fc.campaign_name,
+	   fa.adset_name,
+	   fabd.spend,
+	   fabd.impressions,
+	   fabd.reach,
+	   fabd.clicks,
+	   fabd.leads,
+	   fabd.value 
+from facebook_ads_basic_daily fabd 
+join facebook_adset fa    on fa.adset_id = fabd.adset_id 
+join facebook_campaign fc on fc.campaign_id = fabd.campaign_id 
+where leads  is not null
+;
+
+
+--Task 2
+
+select *
+from google_ads_basic_daily gabd
+;
+
+
+select ad_date,
+	   campaign_name,
+	   adset_name,
+	   spend,
+	   impressions,
+	   reach,
+	   clicks,
+	   leads,
+	   value 
+from google_ads_basic_daily gabd
+;
+
+
+--example 1
+
+
+select 
+	  ad_date,
+	  campaign_name,
+	  adset_name,
+	  spend,		 
+	  impressions,	
+	  reach,
+      clicks,
+      leads,
+      value,
+      'Google' as media_source
+from google_ads_basic_daily gabd
+union all
+select 
+	  fabd.ad_date,
+	  fc.campaign_name,
+   	  fa.adset_name,
+      fabd.spend,
+      fabd.impressions,
+      fabd.reach,
+      fabd.clicks,
+      fabd.leads,		 
+      fabd.value,
+      'Facebook' as media_source
+from facebook_ads_basic_daily fabd 
+join facebook_adset fa    on fa.adset_id = fabd.adset_id 
+join facebook_campaign fc on fc.campaign_id = fabd.campaign_id 
+where leads  is not null
+;
+			
+--example 2
+
+
+with 
+	 google as (
+		select 
+		       ad_date,
+			   campaign_name,
+			   adset_name,
+			   spend,
+			   impressions,
+			   reach,
+			   clicks,
+			   leads,
+			   value 
+	    from google_ads_basic_daily gabd
+			),
+	 facebook as (
+		select 
+		       fabd.ad_date,
+			   fc.campaign_name,
+			   fa.adset_name,
+			   fabd.spend,
+			   fabd.impressions,
+			   fabd.reach,
+			   fabd.clicks,
+			   fabd.leads,
+			   fabd.value 
+		from facebook_ads_basic_daily fabd 
+		join facebook_adset fa    on fa.adset_id = fabd.adset_id 
+		join facebook_campaign fc on fc.campaign_id = fabd.campaign_id 
+		where leads  is not null
+		)
+select
+	  t1.ad_date 		 as fb_ad_date,
+	  t1.campaign_name   as fb_campaign_name, 
+	  t1.adset_name   	 as fb_adset_name,
+	  t1.spend 			 as fb_spend,
+	  t1.impressions 	 as fb_impressions,
+	  t1.reach	 		 as fb_reach,
+	  t1.clicks			 as fb_clicks,
+	  t1.value			 as fb_value,
+	  t2.ad_date 		 as gl_ad_date,
+	  t2.campaign_name   as gl_campaign_name, 
+	  t2.adset_name 	 as gl_adset_name,
+	  t2.spend 			 as gl_spend,
+	  t2.impressions 	 as gl_impressions,
+	  t2.reach	 		 as gl_reach,
+	  t2.clicks			 as gl_clicks,
+	  t2.value			 as gl_value
+from google as t1
+full join facebook as t2 on t1.ad_date = t2.ad_date 
+	 and t1.campaign_name = t2.campaign_name
+	 and t1.adset_name    = t2.adset_name
+	 and t1.spend         = t2.spend
+	 and t1.impressions   = t2.impressions 
+	 and t1.reach         = t2.reach	 		
+	 and t1.clicks        = t2.clicks			 
+	 and t1.value         = t2.value 
+;
+
+
+--Task 3
+
+
+
+with 
+	google as (
+		select 
+		       ad_date,
+		       'Google Ads'     as media_source,
+			   campaign_name,
+			   adset_name,
+			   sum(spend)       as total_spends,
+			   sum(impressions) as total_impressions,
+			   sum(clicks)      as total_clicks,
+			   sum(value)       as total_values
+	from google_ads_basic_daily gabd
+	group by ad_date,  campaign_name, adset_name
+			),
+	facebook as (
+		select 
+		       fabd.ad_date,
+		       'Facebook Ads'        as media_source,
+			   fc.campaign_name,
+			   fa.adset_name,
+			   sum(fabd.spend)       as total_spends,
+			   sum(fabd.impressions) as total_impressions,
+			   sum(fabd.clicks)      as total_clicks,
+			   sum(fabd.value)       as total_values
+		from facebook_ads_basic_daily fabd 
+		join facebook_adset fa    on fa.adset_id = fabd.adset_id 
+		join facebook_campaign fc on fc.campaign_id = fabd.campaign_id 
+		where leads  is not null
+		group by  fabd.ad_date, fc.campaign_name,  fa.adset_name
+		), 
+	common_tab as (
+	   select *
+	   from facebook
+	   union all
+	   select*
+	   from google
+	  )
+select ad_date, media_source, campaign_name, adset_name, total_spends, 
+total_impressions, total_clicks,total_values
+from common_tab 
+group by ad_date, media_source, campaign_name, adset_name, total_spends, 
+total_impressions, total_clicks,total_values
+;
+
+
+
+
