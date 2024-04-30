@@ -1,0 +1,246 @@
+--Task 1
+
+select *
+from facebook_ads_basic_daily fabd 
+;
+
+select *
+from facebook_adset fa 
+;
+
+select *
+from facebook_campaign fc 
+;
+
+select *
+from google_ads_basic_daily gabd 
+;
+
+
+with
+	google as (
+		select 
+		  ad_date,
+		  'Google' as media_source,
+		  url_parameters,
+		  spend,		 
+		  impressions,	
+		  reach,
+	      clicks,
+	      leads,
+	      value
+	from google_ads_basic_daily gabd
+	),
+	facebook as (
+	    select 
+		  fabd.ad_date,
+		  'Facebook' as media_source,
+		  fabd.url_parameters,
+	      fabd.spend,
+	      fabd.impressions,
+	      fabd.reach,
+	      fabd.clicks,
+	      fabd.leads,		 
+	      fabd.value
+	from facebook_ads_basic_daily fabd
+	),
+	common_tab as (
+		 select *
+		 from facebook
+		 union all
+		 select *
+		 from google
+		 )
+select 
+	ad_date, 
+	media_source,
+    url_parameters,
+    coalesce (spend,0) as spend, 
+	coalesce (impressions,0) as impressions,
+	coalesce (reach,0) as reach,
+    coalesce (clicks,0) as clicks,
+    coalesce (leads,0) as leads,
+    coalesce (value,0) as value
+from common_tab
+order by ad_date desc
+;
+
+--Task 2
+
+
+select 
+	url_parameters,
+	substring(url_parameters, 'utm_medium=([^&#$]+)')
+from facebook_ads_basic_daily fabd
+;
+
+with
+	google as (
+		select 
+		  ad_date,
+		  'Google' as media_source,
+		  url_parameters,
+		  spend,		 
+		  impressions,	
+		  reach,
+	      clicks,
+	      leads,
+	      value
+	from google_ads_basic_daily gabd
+	),
+	facebook as (
+	    select 
+		  fabd.ad_date,
+		  'Facebook' as media_source,
+		  fabd.url_parameters,
+	      fabd.spend,
+	      fabd.impressions,
+	      fabd.reach,
+	      fabd.clicks,
+	      fabd.leads,		 
+	      fabd.value
+	from facebook_ads_basic_daily fabd
+	),
+	common_tab as (
+		 select *
+		 from facebook
+		 union all
+		 select *
+		 from google
+		 )
+select 
+	ad_date, 
+	media_source,
+	url_parameters, 
+	coalesce (spend,0) as spend, 
+	coalesce (impressions,0) as impressions,
+	coalesce (reach,0) as reach,
+    coalesce (clicks,0) as clicks,
+    coalesce (leads,0) as leads,
+    coalesce (value,0) as value,
+   case when      lower(substring(url_parameters, 'utm_campaign=([^&#$]+)')) = 'nan' 
+   then null else lower(substring(url_parameters,'utm_campaign=([^&#$]+)')) 
+   end as utm_campaign
+from common_tab
+group by ad_date, media_source, url_parameters, spend, impressions, reach, clicks,leads, value
+order by ad_date desc
+;
+
+
+--example 1
+
+with
+	google as (
+		select 
+		  ad_date,
+		  'Google' as media_source,
+		  url_parameters,
+		  spend,		 
+		  impressions,	
+		  reach,
+	      clicks,
+	      leads,
+	      value
+	from google_ads_basic_daily gabd
+	),
+	facebook as (
+	    select 
+		  fabd.ad_date,
+		  'Facebook' as media_source,
+		  fabd.url_parameters,
+	      fabd.spend,
+	      fabd.impressions,
+	      fabd.reach,
+	      fabd.clicks,
+	      fabd.leads,		 
+	      fabd.value
+	from facebook_ads_basic_daily fabd
+	),
+	common_tab as (
+		 select *
+		 from facebook
+		 union all
+		 select *
+		 from google
+		 )
+select 
+	ad_date, 
+	media_source,
+	url_parameters,
+	sum(spend) as total_spend,                                                                                                                                  
+	sum(impressions) as total_impressions,                                                                                                                     
+	sum(clicks) as total_clicks,                                                                                                                                   
+	sum(value) as total_value,    
+	case when sum(impressions)>0 then sum(clicks)::numeric/sum(impressions)  else -1 end as ctr,
+	case when sum(clicks)> 0 then  sum(spend)/sum(clicks) else -1 end as cpc,
+	case when sum(impressions)>0 then  1000*sum(spend)/sum(impressions)  else -1 end as cpm,
+	case when sum(spend)>0 then sum(value)::numeric/sum(spend)  else -1 end as romi
+from common_tab
+group by ad_date, media_source, url_parameters
+order by ad_date desc
+;
+
+--example 2
+with 
+	google as (
+		select 
+			   ad_date,
+			   'Google' as media_source,
+			   campaign_name,
+			   adset_name,
+			   url_parameters,
+			   spend,		 
+			   impressions,	
+			   reach,
+		       clicks,
+		       leads,
+		       value
+	from google_ads_basic_daily gabd
+	group by ad_date, media_source, campaign_name, adset_name, url_parameters,
+    spend, impressions, reach, clicks, leads, value
+			),
+	facebook as (
+		select 
+		       fabd.ad_date,
+		       'Facebook Ads' as media_source,
+			   fc.campaign_name,
+			   fa.adset_name,
+			   fabd.url_parameters,
+		       fabd.spend,
+		       fabd.impressions,
+		       fabd.reach,
+		       fabd.clicks,
+		       fabd.leads,		 
+		       fabd.value
+		from facebook_ads_basic_daily fabd 
+		join facebook_adset fa    on fa.adset_id = fabd.adset_id 
+		join facebook_campaign fc on fc.campaign_id = fabd.campaign_id 
+		where leads  is not null
+		group by  fabd.ad_date, media_source, fc.campaign_name,  fa.adset_name, fabd.url_parameters,
+		fabd.spend, fabd.impressions, fabd.reach, fabd.clicks, fabd.leads, fabd.value
+		), 
+	common_tab as (
+	   select *
+	   from facebook
+	   union all
+	   select *
+	   from google
+	  )
+select 
+	ad_date, 
+	media_source,
+	campaign_name,
+	adset_name,
+	url_parameters,
+	sum(spend) as total_spend,                                                                                                                                  
+	sum(impressions) as total_impressions,                                                                                                                     
+	sum(clicks) as total_clicks,                                                                                                                                   
+	sum(value) as total_value,    
+	case when sum(impressions)>0 then sum(clicks)::numeric/sum(impressions)  else -1 end as ctr,
+	case when sum(clicks)> 0 then  sum(spend)/sum(clicks) else -1 end as cpc,
+	case when sum(impressions)>0 then  1000*sum(spend)/sum(impressions)  else -1 end as cpm,
+	case when sum(spend)>0 then sum(value)::numeric/sum(spend)  else -1 end as romi
+from common_tab
+group by ad_date, media_source, campaign_name, adset_name, url_parameters
+order by ad_date desc
+;
