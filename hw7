@@ -1,0 +1,167 @@
+--Task 1,2
+--Example 1
+
+with 
+	google as (
+		select 
+			   ad_date,
+			   url_parameters,
+			   spend,		 
+			   impressions,	
+			   reach,
+		       clicks,
+		       leads,
+		       value
+	from google_ads_basic_daily gabd
+			),
+	facebook as (
+		select 
+		       fabd.ad_date,
+			   fabd.url_parameters,
+		       fabd.spend,
+		       fabd.impressions,
+		       fabd.reach,
+		       fabd.clicks,
+		       fabd.leads,		 
+		       fabd.value
+	from facebook_ads_basic_daily fabd
+		), 
+	common_tab as (
+	   select *
+	   from facebook
+	   union all
+	   select *
+	   from google
+	  )
+select 
+	  date_trunc('month',ad_date) as ad_month,
+	  substring(url_parameters, 'utm_campaign=([^&#$]+)') as utm_campaign,
+      sum(spend)       as total_spend,                                                                                                                                  
+      sum(impressions) as total_impressions,                                                                                                                     
+      sum(clicks)      as total_clicks,                                                                                                                                   
+	  sum(value)       as total_value,    
+	  case when sum(impressions)>0 then sum(clicks)::numeric/sum(impressions)  else -1 end as ctr,
+	  case when sum(clicks)> 0     then sum(spend)/sum(clicks)                 else -1 end as cpc,
+	  case when sum(impressions)>0 then 1000*sum(spend)/sum(impressions)       else -1 end as cpm,
+	  case when sum(spend)>0       then sum(value)::numeric/sum(spend)         else -1 end as romi
+from common_tab
+group by ad_month, utm_campaign
+;
+
+--Example 2
+
+
+with
+    main_tab as(
+		select
+			ad_date,
+			url_parameters,
+			coalesce(spend,  0)      as spend,
+			coalesce(impressions, 0) as impressions,
+			coalesce(reach,  0)      as reach,
+			coalesce(clicks, 0)      as clicks,
+			coalesce(leads,  0)      as leads,
+			coalesce(value,  0)      as value
+		from facebook_ads_basic_daily
+		union all
+		select
+			ad_date,
+			url_parameters,
+			coalesce(spend,  0)      as spend,
+			coalesce(impressions, 0) as impressions,
+			coalesce(reach,  0)      as reach,
+			coalesce(clicks, 0)      as clicks,
+			coalesce(leads,  0)      as leads,
+			coalesce(value,  0)      as value
+		from google_ads_basic_daily gabd
+		)
+ select 
+ 	  ad_date,
+	  date_trunc('month',ad_date) as ad_month,
+	  substring(url_parameters, 'utm_campaign=([^&#$]+)') as utm_campaign,
+	  sum(spend)       as total_spend,                                                                                                                                  
+	  sum(impressions) as total_impressions,                                                                                                                     
+	  sum(clicks)      as total_clicks,                                                                                                                                   
+	  sum(value)       as total_value,    
+      case when sum(impressions)>0 then sum(clicks)::numeric/sum(impressions)  else -1 end as ctr,
+	  case when sum(clicks)> 0     then sum(spend)/sum(clicks)                 else -1 end as cpc,
+	  case when sum(impressions)>0 then 1000*sum(spend)/sum(impressions)       else -1 end as cpm,
+	  case when sum(spend)>0       then sum(value)::numeric/sum(spend)         else -1 end as romi
+from main_tab
+group by ad_date, ad_month, utm_campaign
+order by ad_date desc 
+;
+
+
+--Task 3
+
+with
+	google as (
+		select
+			   ad_date,
+			   url_parameters,
+			   spend,		
+			   impressions,	
+			   reach,
+		       clicks,
+		       leads,
+		       value
+	    from google_ads_basic_daily gabd
+		 ),
+	facebook as (
+		 select
+		       fabd.ad_date,
+			   fabd.url_parameters,
+		       fabd.spend,
+		       fabd.impressions,
+		       fabd.reach,
+		       fabd.clicks,
+		       fabd.leads,		
+		       fabd.value
+		 from facebook_ads_basic_daily fabd
+		),
+	common_tab as (
+			   select *
+			   from facebook
+			   union all
+			   select *
+			   from google
+	     ),
+    common_tab2 as (
+		       select
+			   date_trunc('month',ad_date)::date as ad_month,
+			   substring(url_parameters, 'utm_campaign=([^&#$]+)') as utm_campaign,
+			   sum(spend)       as total_spend,
+			   sum(impressions) as total_impressions,
+			   sum(clicks)      as total_clicks,
+			   sum(value)       as total_value,
+			   case when sum(impressions)>0 then sum(clicks)::numeric/sum(impressions)  else -1 end as ctr,
+		   	   case when sum(clicks)> 0     then sum(spend)/sum(clicks)                 else -1 end as cpc,
+			   case when sum(impressions)>0 then 1000*sum(spend)/sum(impressions)       else -1 end as cpm,
+			   case when sum(spend)>0       then sum(value)::numeric/sum(spend)         else -1 end as romi
+		 from common_tab
+	     group by
+	     	utm_campaign,
+	     	ad_month
+	     having
+	     	sum(spend)>0 
+			 )
+select
+  ad_month,
+  utm_campaign,
+  total_spend,
+  total_impressions,
+  total_clicks,
+  total_value, 
+  ctr,
+  lag (ctr)  over (order by ad_month asc)  as ctr_1m_ago,
+  round(((ctr  / lag(ctr)  over (partition by utm_campaign   order by utm_campaign, ad_month asc))-1)*100.0, 1) as diff_ctr,
+  cpm,
+  lag (cpm)  over (order by ad_month asc)  as cpm_1m_ago,
+  round(((cpm  / lag(cpm)  over (partition by utm_campaign   order by utm_campaign, ad_month desc))-1)*100.0, 1) as diff_cpm,
+  romi,
+  lag (romi) over (order by ad_month asc)  as romi_1m_ago,
+  round(((romi  / lag(romi)  over (partition by utm_campaign order by utm_campaign, ad_month asc))-1)*100.0, 1) as diff_romi
+from common_tab2
+order by  utm_campaign, ad_month asc
+;
